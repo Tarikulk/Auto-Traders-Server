@@ -47,6 +47,13 @@ async function run(){
         }) 
 
 
+        app.get("/categoriesCar/:id", async(req, res) =>{
+            const id = req.params.id
+            const query = {}
+            const categoriesCar = await categoriesCarCollection.find(query).toArray();
+            const singleCategory = categoriesCar.filter(category => category.category_id === id)
+            res.send(singleCategory);
+        })
 
         
          
