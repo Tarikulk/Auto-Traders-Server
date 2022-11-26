@@ -20,6 +20,7 @@ async function run(){
         const userCollection = client.db("resaleWebServer").collection("users");
         const carCategoryCollection = client.db("resaleWebServer").collection("categories")
         const categoriesCarCollection = client.db("resaleWebServer").collection("categoriesCar")
+        const bookingsCarCollection = client.db("resaleWebServer").collection("bookings")
 
 
         app.put("/user/:email", async(req, res) =>{
@@ -55,7 +56,12 @@ async function run(){
             res.send(singleCategory);
         })
 
-        
+        app.post("/bookings", async(req, res) =>{
+            const booking = req.body;
+            const result = await bookingsCarCollection.insertOne(booking);
+            res.send(result);
+        })
+                
          
     }
     finally{
