@@ -41,6 +41,13 @@ async function run(){
             res.send({result, token})
         })
 
+        app.get("/user/:email", async(req, res) =>{
+            const email = req.params.email;
+            const query = {email:email};
+            const user = await userCollection.findOne(query);
+            res.send(user)
+        })
+
         app.get("/categories", async(req, res) =>{
             const query = {}
             const category = await carCategoryCollection.find(query).toArray();
@@ -56,10 +63,28 @@ async function run(){
             res.send(singleCategory);
         })
 
+        app.post("/categoriesCar", async(req, res) =>{
+            const categoriesCar = req.body;
+            const result = await categoriesCarCollection.insertOne(categoriesCar);
+            res.send(result);
+        })
+
         app.post("/bookings", async(req, res) =>{
             const booking = req.body;
             const result = await bookingsCarCollection.insertOne(booking);
             res.send(result);
+        })
+
+        app.get("/bookings/:email", async(req, res) =>{
+            let query = {}
+            const email = req.query.email;
+            if(email){
+                query = {
+                    email : email,
+                }
+            } 
+            const booking = await bookingsCarCollection.find(query).toArray();
+            res.send(booking)
         })
                 
          
