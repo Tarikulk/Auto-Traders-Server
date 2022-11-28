@@ -1,9 +1,10 @@
 const express = require("express");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 const port = process.env.PORT || 5000;
 
@@ -21,6 +22,7 @@ async function run(){
         const carCategoryCollection = client.db("resaleWebServer").collection("categories")
         const categoriesCarCollection = client.db("resaleWebServer").collection("categoriesCar")
         const bookingsCarCollection = client.db("resaleWebServer").collection("bookings")
+        const paymentsCollection = client.db("resaleWebServer").collection("payments")
 
 
         app.put("/user/:email", async(req, res) =>{
@@ -48,12 +50,13 @@ async function run(){
             res.send(user)
         })
 
+        
         app.get("/categories", async(req, res) =>{
             const query = {}
             const category = await carCategoryCollection.find(query).toArray();
             res.send(category);
         }) 
- 
+        
         app.get("/categoriesCar/:id", async(req, res) =>{
             const id = req.params.id
             const query = {}
@@ -67,29 +70,52 @@ async function run(){
             const result = await categoriesCarCollection.insertOne(categoriesCar);
             res.send(result);
         })
-
+        
+        
         app.post("/bookings", async(req, res) =>{
             const booking = req.body;
             const result = await bookingsCarCollection.insertOne(booking);
             res.send(result);
+        }) 
+        
+        app.get("/bookings", async(req, res) =>{
+            const email = req.query.email
+            const query = {email:  email}
+            const bookings = await bookingsCarCollection.find(query).toArray();
+            res.send(bookings)
+        })
+        
+        app.get("/bookings/:id", async(req, res) =>{
+            const id = req.params.id;
+            const query = {_id : ObjectId(id)}
+            const booking = await bookingsCarCollection.findOne(query);
+            res.send(booking);
+        })
+        
+        app.post("/create-payment-intent", async(req, res) =>{
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+    
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: "usd",
+                amount : amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret, 
+            })
         })
 
-        app.get("/bookings/:email", async(req, res) =>{
-            let query = {}
-            const email = req.query.email;
-            if(email){
-                query = {
-                    email : email,
-                }
-            } 
-            const booking = await bookingsCarCollection.find(query).toArray();
-            res.send(booking)
-        })
-                
-         
+
+    
+        
+        
     }
     finally{
-
+        
     }
 }
 
