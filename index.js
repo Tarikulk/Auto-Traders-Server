@@ -65,9 +65,23 @@ async function run(){
             res.send(singleCategory);
         })
 
+        app.get("/categoriesCar", async(req, res) =>{
+            const email = req.query.email
+            const query = {email:  email}
+            const categories = await categoriesCarCollection.find(query).toArray();
+            res.send(categories)
+        })
+
         app.post("/categoriesCar", async(req, res) =>{
             const categoriesCar = req.body;
             const result = await categoriesCarCollection.insertOne(categoriesCar);
+            res.send(result);
+        })
+
+        app.delete("/categoriesCar/:id", async(req, res) =>{
+            const id = req.params.id;
+            const filter = {_id : ObjectId(id)}
+            const result = await categoriesCarCollection.deleteOne(filter);
             res.send(result);
         })
         
