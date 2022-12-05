@@ -16,6 +16,23 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@clu
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 }); 
 
 
+function verifyJWT(req, res, next){
+      const authHeader = req.headers.authorization;
+      if(!authHeader){
+        return res.status(401).send({message : "unauthorized access"})
+      }
+
+      const token = authHeader.split(" ")[1]
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function(err, decoded){
+        if(err){
+            return res.status(403).send({message: "forbidden access"})
+        }
+        req.decoded =  decoded;
+        next()
+      })
+}
+
+
 async function run(){
     try{
         const userCollection = client.db("resaleWebServer").collection("users");
@@ -23,27 +40,51 @@ async function run(){
         const categoriesCarCollection = client.db("resaleWebServer").collection("categoriesCar")
         const bookingsCarCollection = client.db("resaleWebServer").collection("bookings")
         const paymentsCollection = client.db("resaleWebServer").collection("payments")
+        const advertiseCollection = client.db("resaleWebServer").collection("advertise")
 
-
-        app.put("/user/:email", async(req, res) =>{
-            const email = req.params.email;
+  
+        app.put("/user", async(req, res) =>{
+            const email = req.query.email;
             const user = req.body;
             const filter = {email: email}
             const options = {upsert: true}
             const updatedDoc = {
                 $set: user,
             } 
-            const result = await userCollection.updateOne(filter, updatedDoc, options);
+            const result = await userCollection.updateOne(filter, updatedDoc, options); 
 
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-                expiresIn:"1d",
-            })
-            console.log(token)
+            if(user){
+                const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+                    expiresIn:"1d",
+                })
+                return res.send({result, token})
+            }
+             res.status(403).send({message: "unauthorized access"})
 
-            res.send({result, token})
         })
 
-        app.get("/user/:email", async(req, res) =>{
+
+        app.put("/user/verify/:id", verifyJWT, async(req, res) =>{
+             const decodedEmail = req.decoded.email;
+             const query = {email: decodedEmail};
+             const user = await userCollection.findOne(query);
+             if(user.role !== "admin"){
+                res.status(403).send({message: "forbidden access"})
+             }
+             const id = req.params.id;
+             const filter = {_id : ObjectId(id)};
+             const options = {upsert : true};
+             const updatedDoc = {
+                $set:{
+                    status: "verify"
+                }
+             }
+             const result = await userCollection.updateOne(filter, updatedDoc, options);
+             res.send(result);
+        })
+
+
+        app.get("/user/:email", verifyJWT, async(req, res) =>{
             const email = req.params.email;
             const query = {email:email};
             const user = await userCollection.findOne(query);
@@ -64,7 +105,7 @@ async function run(){
             const singleCategory = categoriesCar.filter(category => category.category_id === id)
             res.send(singleCategory);
         })
-
+ 
         app.get("/categoriesCar", async(req, res) =>{
             const email = req.query.email
             const query = {email:  email}
@@ -72,7 +113,7 @@ async function run(){
             res.send(categories)
         })
 
-        app.post("/categoriesCar", async(req, res) =>{
+        app.post("/categoriesCar", verifyJWT, async(req, res) =>{
             const categoriesCar = req.body;
             const result = await categoriesCarCollection.insertOne(categoriesCar);
             res.send(result);
@@ -86,14 +127,14 @@ async function run(){
         })
         
         
-        app.post("/bookings", async(req, res) =>{
+        app.post("/bookings", verifyJWT, async(req, res) =>{
             const booking = req.body;
             const result = await bookingsCarCollection.insertOne(booking);
             res.send(result);
         }) 
         
-        app.get("/bookings", async(req, res) =>{
-            const email = req.query.email
+        app.get("/bookings", verifyJWT, async(req, res) =>{
+            const email = req.query.email; 
             const query = {email:  email}
             const bookings = await bookingsCarCollection.find(query).toArray();
             res.send(bookings)
@@ -104,6 +145,46 @@ async function run(){
             const query = {_id : ObjectId(id)}
             const booking = await bookingsCarCollection.findOne(query);
             res.send(booking);
+        })
+
+        app.get("/allSellers", verifyJWT, async(req, res) =>{
+            const query = {}
+            const allSellers = await userCollection.find(query).toArray();
+            const sellers = allSellers.filter(seller => seller.role === "seller");
+            res.send(sellers);
+        })
+
+        app.delete("/allSellers/:id", verifyJWT, async(req, res) =>{
+            const id = req.params.id;
+            const filter = {_id : ObjectId(id)}
+            const result = await userCollection.deleteOne(filter);
+            res.send(result); 
+        })
+
+        app.get("/allBuyers", verifyJWT, async(req, res) =>{
+            const query = {}
+            const allBuyers = await userCollection.find(query).toArray();
+            const buyers = allBuyers.filter(seller => seller.role === "buyer");
+            res.send(buyers);
+        })
+
+        app.delete("/allBuyers/:id", verifyJWT, async(req, res) =>{
+            const id = req.params.id;
+            const filter = {_id : ObjectId(id)}
+            const result = await userCollection.deleteOne(filter);
+            res.send(result); 
+        })
+
+        app.post("/advertise", verifyJWT, async(req, res) =>{
+            const advertise = req.body;
+            const result = await advertiseCollection.insertOne(advertise);
+            res.send(result);
+        })
+
+        app.get("/advertise", async(req, res) =>{
+            const query = {}
+            const advertise = await advertiseCollection.find(query).toArray();
+            res.send(advertise);
         })
         
         app.post("/create-payment-intent", async(req, res) =>{
@@ -137,8 +218,7 @@ async function run(){
             const updatedResult = await bookingsCarCollection.updateOne(filter, updatedDoc)
             res.send(result);
         })
-        
-        
+          
     }
     finally{
         
